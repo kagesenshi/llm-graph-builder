@@ -17,6 +17,7 @@ ARG VITE_LLM_MODELS_PROD="openai_gpt_4o,openai_gpt_4o_mini,diffbot,gemini_1.5_fl
 ARG VITE_AUTH0_CLIENT_ID=""
 ARG VITE_AUTH0_DOMAIN=""
 ARG VITE_SKIP_AUTH="false"
+ARG DEPLOYMENT_ENV="local"
 
 WORKDIR /app
 RUN microdnf install findutils tar gzip bzip2 nginx -y && microdnf clean all

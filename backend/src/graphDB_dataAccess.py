@@ -173,28 +173,33 @@ class graphDBdataAccess:
         return self.check_edition() == 'community'
 
     def check_account_access(self, database):
-        if self.is_community_edition():
-            logging.info(f"The server is a community edition server. Assume have write access")
-            return True
-
-        query = """
-        SHOW USER PRIVILEGES 
-        YIELD * 
-        WHERE graph = $database AND action IN ['read'] 
-        RETURN COUNT(*) AS readAccessCount
-        """
         try:
-            logging.info(f"Checking access for database: {database}")
+            query_dbms_componenet = "call dbms.components() yield edition"
+            result_dbms_componenet = self.graph.query(query_dbms_componenet)
 
-            result = self.graph.query(query, params={"database": database})
-            read_access_count = result[0]["readAccessCount"] if result else 0
+            if  result_dbms_componenet[0]["edition"] == "enterprise":
+                query = """
+                SHOW USER PRIVILEGES 
+                YIELD * 
+                WHERE graph = $database AND action IN ['read'] 
+                RETURN COUNT(*) AS readAccessCount
+                """
+            
+                logging.info(f"Checking access for database: {database}")
 
-            logging.info(f"Read access count: {read_access_count}")
+                result = self.graph.query(query, params={"database": database})
+                read_access_count = result[0]["readAccessCount"] if result else 0
 
-            if read_access_count > 0:
-                logging.info("The account has read access.")
-                return False
+                logging.info(f"Read access count: {read_access_count}")
+
+                if read_access_count > 0:
+                    logging.info("The account has read access.")
+                    return False
+                else:
+                    logging.info("The account has write access.")
+                    return True
             else:
+                #Community version have no roles to execute admin command, so assuming write access as TRUE
                 logging.info("The account has write access.")
                 return True
 
@@ -278,17 +283,18 @@ class graphDBdataAccess:
                 d.entityNodeCount AS entityNodeCount,
                 d.entityEntityRelCount AS entityEntityRelCount,
                 d.communityNodeCount AS communityNodeCount,
-                d.communityRelCount AS communityRelCount
+                d.communityRelCount AS communityRelCount,
+                d.createdAt AS created_time
                 """
         param = {"file_name" : file_name}
         return self.execute_query(query, param)
     
     def delete_file_from_graph(self, filenames, source_types, deleteEntities:str, merged_dir:str, uri):
-        # filename_list = filenames.split(',')
+        
         filename_list= list(map(str.strip, json.loads(filenames)))
         source_types_list= list(map(str.strip, json.loads(source_types)))
         gcs_file_cache = os.environ.get('GCS_FILE_CACHE')
-        # source_types_list = source_types.split(',')
+        
         for (file_name,source_type) in zip(filename_list, source_types_list):
             merged_file_path = os.path.join(merged_dir, file_name)
             if source_type == 'local file' and gcs_file_cache == 'True':
@@ -297,18 +303,22 @@ class graphDBdataAccess:
             else:
                 logging.info(f'Deleted File Path: {merged_file_path} and Deleted File Name : {file_name}')
                 delete_uploaded_local_file(merged_file_path,file_name)
-        query_to_delete_document=""" 
-           MATCH (d:Document) where d.fileName in $filename_list and d.fileSource in $source_types_list
-            with collect(d) as documents 
-            unwind documents as d
+                
+        query_to_delete_document="""
+            MATCH (d:Document)
+            WHERE d.fileName IN $filename_list AND coalesce(d.fileSource, "None") IN $source_types_list
+            WITH COLLECT(d) AS documents
+            CALL (documents) {
+            UNWIND documents AS d
             optional match (d)<-[:PART_OF]-(c:Chunk) 
             detach delete c, d
-            return count(*) as deletedChunks
+            } IN TRANSACTIONS OF 1 ROWS
             """
-        query_to_delete_document_and_entities="""
+        query_to_delete_document_and_entities = """
             MATCH (d:Document)
-            WHERE d.fileName IN $filename_list AND d.fileSource IN $source_types_list
+            WHERE d.fileName IN $filename_list AND coalesce(d.fileSource, "None") IN $source_types_list
             WITH COLLECT(d) AS documents
+            CALL (documents) {
             UNWIND documents AS d
             OPTIONAL MATCH (d)<-[:PART_OF]-(c:Chunk)
             OPTIONAL MATCH (c:Chunk)-[:HAS_ENTITY]->(e)
@@ -321,7 +331,8 @@ class graphDBdataAccess:
             FOREACH (chunk IN chunks | DETACH DELETE chunk)
             FOREACH (entity IN entities | DETACH DELETE entity)
             DETACH DELETE d
-            """  
+            } IN TRANSACTIONS OF 1 ROWS
+            """
         query_to_delete_communities = """
             MATCH (c:`__Community__`)
             WHERE c.level = 0 AND NOT EXISTS { ()-[:IN_COMMUNITY]->(c) }
@@ -343,7 +354,7 @@ class graphDBdataAccess:
         else :
             result = self.execute_query(query_to_delete_document, param)    
             logging.info(f"Deleting {len(filename_list)} documents = '{filename_list}' from '{source_types_list}' with their entities from database")
-        return result, len(filename_list)
+        return len(filename_list)
     
     def list_unconnected_nodes(self):
         query = """
@@ -401,9 +412,9 @@ class graphDBdataAccess:
                 AND 
                 (
                 // either contains each other as substrings or has a text edit distinct of less than 3
-                (size(toString(other.id)) > 2 AND toLower(n.id) CONTAINS toLower(other.id)) OR 
-                (size(toString(n.id)) > 2 AND toLower(other.id) CONTAINS toLower(n.id))
-                OR (size(toString(n.id))>5 AND apoc.text.distance(toLower(n.id), toLower(other.id)) < $duplicate_text_distance)
+                (size(toString(other.id)) > 2 AND toLower(toString(n.id)) CONTAINS toLower(toString(other.id))) OR 
+                (size(toString(n.id)) > 2 AND toLower(toString(other.id)) CONTAINS toLower(toString(n.id)))
+                OR (size(toString(n.id))>5 AND apoc.text.distance(toLower(toString(n.id)), toLower(toString(other.id))) < $duplicate_text_distance)
                 OR
                 vector.similarity.cosine(other.embedding, n.embedding) > $duplicate_score_value
                 )] as similar
@@ -537,5 +548,31 @@ class graphDBdataAccess:
                     "nodeCount" : nodeCount,
                     "relationshipCount" : relationshipCount
                     }
-          
+
         return response
+    
+    def get_nodelabels_relationships(self):
+        node_query = """
+                    CALL db.labels() YIELD label
+                    WITH label
+                    WHERE NOT label IN ['Document', 'Chunk', '_Bloom_Perspective_', '__Community__', '__Entity__']
+                    CALL apoc.cypher.run("MATCH (n:`" + label + "`) RETURN count(n) AS count",{}) YIELD value
+                    WHERE value.count > 0
+                    RETURN label order by label
+                    """
+
+        relation_query = """
+                CALL db.relationshipTypes() yield relationshipType
+                WHERE NOT relationshipType  IN ['PART_OF', 'NEXT_CHUNK', 'HAS_ENTITY', '_Bloom_Perspective_','FIRST_CHUNK','SIMILAR','IN_COMMUNITY','PARENT_COMMUNITY'] 
+                return relationshipType order by relationshipType
+                """
+            
+        try:
+            node_result = self.execute_query(node_query)
+            node_labels = [record["label"] for record in node_result]
+            relationship_result = self.execute_query(relation_query)
+            relationship_types = [record["relationshipType"] for record in relationship_result]
+            return node_labels,relationship_types
+        except Exception as e:
+            print(f"Error in getting node labels/relationship types from db: {e}")
+            return []

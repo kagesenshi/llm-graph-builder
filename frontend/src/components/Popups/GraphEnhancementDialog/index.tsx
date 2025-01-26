@@ -3,25 +3,23 @@ import graphenhancement from '../../../assets/images/graph-enhancements.svg';
 import { useState } from 'react';
 import DeletePopUpForOrphanNodes from './DeleteTabForOrphanNodes';
 import deleteOrphanAPI from '../../../services/DeleteOrphanNodes';
-import { UserCredentials } from '../../../types';
-import { useCredentials } from '../../../context/UserCredentials';
 import EntityExtractionSettings from './EnitityExtraction/EntityExtractionSetting';
 import { useFileContext } from '../../../context/UsersFiles';
 import DeduplicationTab from './Deduplication';
 import { tokens } from '@neo4j-ndl/base';
 import PostProcessingCheckList from './PostProcessingCheckList';
+import AdditionalInstructionsText from './AdditionalInstructions';
 
 export default function GraphEnhancementDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   const { breakpoints } = tokens;
   const [orphanDeleteAPIloading, setorphanDeleteAPIloading] = useState<boolean>(false);
   const { setShowTextFromSchemaDialog } = useFileContext();
-  const { userCredentials } = useCredentials();
   const isTablet = useMediaQuery(`(min-width:${breakpoints.xs}) and (max-width: ${breakpoints.lg})`);
 
   const orphanNodesDeleteHandler = async (selectedEntities: string[]) => {
     try {
       setorphanDeleteAPIloading(true);
-      await deleteOrphanAPI(userCredentials as UserCredentials, selectedEntities);
+      await deleteOrphanAPI(selectedEntities);
       setorphanDeleteAPIloading(false);
     } catch (error) {
       setorphanDeleteAPIloading(false);
@@ -68,7 +66,7 @@ export default function GraphEnhancementDialog({ open, onClose }: { open: boolea
                   <Tabs.Tab
                     tabId={0}
                     htmlAttributes={{
-                      'aria-label': 'Database',
+                      'aria-label': 'Entity Extraction Settings',
                     }}
                   >
                     Entity Extraction Settings
@@ -76,13 +74,21 @@ export default function GraphEnhancementDialog({ open, onClose }: { open: boolea
                   <Tabs.Tab
                     tabId={1}
                     htmlAttributes={{
-                      'aria-label': 'Add database',
+                      'aria-label': 'Additional Instructions',
+                    }}
+                  >
+                    Additional Instructions
+                  </Tabs.Tab>
+                  <Tabs.Tab
+                    tabId={2}
+                    htmlAttributes={{
+                      'aria-label': 'Disconnected Nodes',
                     }}
                   >
                     Disconnected Nodes
                   </Tabs.Tab>
                   <Tabs.Tab
-                    tabId={2}
+                    tabId={3}
                     htmlAttributes={{
                       'aria-label': 'Duplication Nodes',
                     }}
@@ -90,9 +96,9 @@ export default function GraphEnhancementDialog({ open, onClose }: { open: boolea
                     De-Duplication Of Nodes
                   </Tabs.Tab>
                   <Tabs.Tab
-                    tabId={3}
+                    tabId={4}
                     htmlAttributes={{
-                      'aria-label': 'Duplication Nodes',
+                      'aria-label': 'Post Processing Jobs',
                     }}
                   >
                     Post Processing Jobs
@@ -117,14 +123,18 @@ export default function GraphEnhancementDialog({ open, onClose }: { open: boolea
           </div>
         </Tabs.TabPanel>
         <Tabs.TabPanel className='n-flex n-flex-col n-gap-token-4 n-p-token-6' value={activeTab} tabId={1}>
-          <DeletePopUpForOrphanNodes deleteHandler={orphanNodesDeleteHandler} loading={orphanDeleteAPIloading} />
+          <AdditionalInstructionsText closeEnhanceGraphSchemaDialog={onClose} />
         </Tabs.TabPanel>
         <Tabs.TabPanel className='n-flex n-flex-col n-gap-token-4 n-p-token-6' value={activeTab} tabId={2}>
-          <DeduplicationTab />
+          <DeletePopUpForOrphanNodes deleteHandler={orphanNodesDeleteHandler} loading={orphanDeleteAPIloading} />
         </Tabs.TabPanel>
         <Tabs.TabPanel className='n-flex n-flex-col n-gap-token-4 n-p-token-6' value={activeTab} tabId={3}>
+          <DeduplicationTab />
+        </Tabs.TabPanel>
+        <Tabs.TabPanel className='n-flex n-flex-col n-gap-token-4 n-p-token-6' value={activeTab} tabId={4}>
           <PostProcessingCheckList />
         </Tabs.TabPanel>
+
       </Dialog.Content>
     </Dialog>
   );

@@ -14,8 +14,9 @@ ARG VITE_CHAT_MODES=""
 ARG VITE_ENV="DEV"
 ARG VITE_BATCH_SIZE=2
 ARG VITE_LLM_MODELS_PROD="openai_gpt_4o,openai_gpt_4o_mini,diffbot,gemini_1.5_flash"
-ARG DEPLOYMENT_ENV="prod"
-ENV DEPLOYMENT_ENV=$DEPLOYMENT_ENV
+ARG VITE_AUTH0_CLIENT_ID=""
+ARG VITE_AUTH0_DOMAIN=""
+ARG VITE_SKIP_AUTH="false"
 
 WORKDIR /app
 RUN microdnf install findutils tar gzip bzip2 nginx -y && microdnf clean all
@@ -37,6 +38,9 @@ RUN source /root/.bashrc && ls && yarn install && \
     VITE_BATCH_SIZE=$VITE_BATCH_SIZE \
     VITE_LLM_MODELS=$VITE_LLM_MODELS \
     VITE_LLM_MODELS_PROD=$VITE_LLM_MODELS_PROD \
+    VITE_AUTH0_CLIENT_ID=$VITE_AUTH0_CLIENT_ID \
+    VITE_AUTH0_DOMAIN=$VITE_AUTH0_DOMAIN \
+    VITE_SKIP_AUTH=$VITE_SKIP_AUTH \
     yarn run build
 
 COPY . ./

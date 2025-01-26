@@ -14,7 +14,7 @@ import {
 import { DocumentDuplicateIconOutline, ClipboardDocumentCheckIconOutline } from '@neo4j-ndl/react/icons';
 import '../../styling/info.css';
 import Neo4jRetrievalLogo from '../../assets/images/Neo4jRetrievalLogo.png';
-import { ExtendedNode, UserCredentials, chatInfoMessage } from '../../types';
+import { ExtendedNode, chatInfoMessage } from '../../types';
 import { useEffect, useMemo, useReducer, useRef, useState } from 'react';
 import GraphViewButton from '../Graph/GraphViewButton';
 import { chunkEntitiesAPI } from '../../services/ChunkEntitiesInfo';
@@ -37,7 +37,7 @@ import { Stack } from '@mui/material';
 import { capitalizeWithUnderscore, getNodes } from '../../utils/Utils';
 import MultiModeMetrics from './MultiModeMetrics';
 import getAdditionalMetrics from '../../services/AdditionalMetrics';
-import { withVisibility } from '../../HOC/withVisibility';
+import { withVisibility } from '../../HOC/WithVisibility';
 import MetricsCheckbox from './MetricsCheckbox';
 
 const ChatInfoModal: React.FC<chatInfoMessage> = ({
@@ -142,7 +142,6 @@ const ChatInfoModal: React.FC<chatInfoMessage> = ({
         toggleInfoLoading();
         try {
           const response = await chunkEntitiesAPI(
-            userCredentials as UserCredentials,
             userCredentials?.database,
             nodeDetails,
             entities_ids,

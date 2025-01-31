@@ -978,6 +978,7 @@ const Content: React.FC<ContentProps> = ({
             >
               {buttonCaptions.showPreviewGraph} {selectedfileslength && completedfileNo ? `(${completedfileNo})` : ''}
             </ButtonWithToolTip>
+            { process.env.VITE_BLOOM_URL && (
             <ButtonWithToolTip
               text={tooltips.bloomGraph}
               placement='top'
@@ -988,7 +989,7 @@ const Content: React.FC<ContentProps> = ({
               size={isTablet ? 'small' : 'medium'}
             >
               {buttonCaptions.exploreGraphWithBloom}
-            </ButtonWithToolTip>
+            </ButtonWithToolTip>)}
             <ButtonWithToolTip
               text={
                 !selectedfileslength ? tooltips.deleteFile : `${selectedfileslength} ${tooltips.deleteSelectedFiles}`
